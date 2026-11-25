@@ -20,4 +20,5 @@ export const nav: NavItem[] = [
   // /settings remains available but is not shown in this focused prototype.
   // Add `{ path: '/settings', label: 'Settings' }` to restore it.
   // ── Features add nav items below this line ──
+  { path: '/assistant', label: 'AI Chat', roles: ['member' as Role] },
 ]

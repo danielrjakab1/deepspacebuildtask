@@ -6,7 +6,7 @@
  * product's point of view instead of extending this page.
  */
 
-import { useAuthProfileReady } from 'deepspace'
+import { useAuthProfileReady, useMutations } from 'deepspace'
 import { APP_NAME } from '../../constants'
 import { useEffect, useRef, useState } from 'react'
 import type { DragEvent } from 'react'
@@ -24,6 +24,7 @@ type Analysis = {
   contrast: number
   saturation: number
   edgeDensity: number
+  desiredAdjectives: string
 }
 
 function clamp(n: number, min = 0, max = 100) { return Math.max(min, Math.min(max, n)) }
@@ -72,6 +73,9 @@ export default function HomePage() {
   const [fileName, setFileName] = useState('')
   const [analysis, setAnalysis] = useState<Analysis | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [adjectiveInput, setAdjectiveInput] = useState('')
+  const [recordId, setRecordId] = useState<string | null>(null)
+  const { ready, createConfirmed, putConfirmed } = useMutations<Analysis>('photo-analyses')
   const imageRef = useRef<HTMLImageElement | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -118,7 +122,22 @@ export default function HomePage() {
       const subject = 48 + confidence * 42
       const score = Math.round(clamp(exposure * 0.23 + clarity * 0.27 + color * 0.18 + subject * 0.32))
       const label = score >= 88 ? 'Exceptional' : score >= 78 ? 'Excellent' : score >= 68 ? 'Strong' : score >= 58 ? 'Promising' : 'Needs work'
-      setAnalysis({ score, label, confidence, topLabel, ...pixels })
+      const result: Analysis = { score, label, confidence, topLabel, ...pixels, desiredAdjectives: adjectiveInput.trim() }
+      setAnalysis(result)
+      if (isSignedIn && ready) {
+        void createConfirmed({
+          fileName,
+          score: result.score,
+          label: result.label,
+          topLabel: result.topLabel,
+          confidence: result.confidence,
+          brightness: result.brightness,
+          contrast: result.contrast,
+          saturation: result.saturation,
+          edgeDensity: result.edgeDensity,
+          desiredAdjectives: result.desiredAdjectives,
+        }).then(setRecordId).catch(() => {})
+      }
       setAnalyzing(false)
     }
     img.src = url
@@ -131,12 +150,25 @@ export default function HomePage() {
     if (file) void analyze(file)
   }
 
+  async function updateAdjectives(value: string) {
+    setAdjectiveInput(value)
+    if (analysis && recordId && ready) {
+      setAnalysis({ ...analysis, desiredAdjectives: value.trim() })
+      await putConfirmed(recordId, { desiredAdjectives: value.trim() })
+    }
+  }
+
   const metrics = analysis ? [
     { icon: Focus, label: 'Subject clarity', value: clamp(48 + analysis.confidence * 42), detail: analysis.topLabel },
     { icon: Sun, label: 'Lighting', value: clamp(100 - Math.abs(analysis.brightness - 58) * 1.15), detail: analysis.brightness > 68 ? 'Bright' : analysis.brightness < 38 ? 'Low light' : 'Balanced' },
     { icon: Contrast, label: 'Composition', value: clamp(35 + analysis.contrast * 0.35 + analysis.edgeDensity * 0.22), detail: analysis.edgeDensity > 55 ? 'Defined' : 'Soft' },
     { icon: Palette, label: 'Color energy', value: clamp(45 + analysis.saturation * 0.42), detail: analysis.saturation > 55 ? 'Vivid' : 'Muted' },
   ] : []
+
+  const desiredAdjectives = adjectiveInput.split(',').map((item) => item.trim()).filter(Boolean)
+  const adjectiveAdvice = desiredAdjectives.length
+    ? `To make the post feel ${desiredAdjectives.join(', ')}, use the strongest visual edit for that tone: tighten the crop, reinforce one focal subject, and adjust lighting/color before adding more detail.`
+    : ''
 
   return (
     <main className="min-h-full bg-[#090a0c] px-4 py-5 text-white sm:px-6">
@@ -213,10 +245,24 @@ export default function HomePage() {
                   <div className="flex items-center gap-2 text-sm font-medium"><CheckCircle2 className="size-4 text-[#a3ff12]" /> Next best move</div>
                   <p className="mt-2 text-xs leading-5 text-white/50">
                     {analysis.score >= 78 ? 'This image is already scroll-ready. Keep the subject close to the frame center and preserve the clean contrast.' : 'Try brighter lighting and a tighter crop around the clearest subject; avoid extra background detail.'}
+                    {adjectiveAdvice && <span className="mt-2 block text-[#a3ff12]">{adjectiveAdvice}</span>}
                   </p>
                 </div>
 
                 <button onClick={() => inputRef.current?.click()} className="mt-4 w-full rounded-full border border-white/10 py-3 text-sm font-medium transition hover:bg-white/[0.04]">Analyze another photo</button>
+
+                <div className="mt-4 max-w-xl">
+                  <label htmlFor="desired-adjectives" className="mb-2 block text-xs font-medium text-white/55">
+                    How should this post feel?
+                  </label>
+                  <input
+                    id="desired-adjectives"
+                    value={adjectiveInput}
+                    onChange={(event) => void updateAdjectives(event.target.value)}
+                    placeholder="e.g. bold, effortless, luxurious"
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white outline-none placeholder:text-white/25 focus:border-[#a3ff12]/50"
+                  />
+                </div>
               </div>
             )}
           </aside>
