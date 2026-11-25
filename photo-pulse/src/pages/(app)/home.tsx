@@ -166,9 +166,22 @@ export default function HomePage() {
   ] : []
 
   const desiredAdjectives = adjectiveInput.split(',').map((item) => item.trim()).filter(Boolean)
-  const adjectiveAdvice = desiredAdjectives.length
-    ? `To make the post feel ${desiredAdjectives.join(', ')}, use the strongest visual edit for that tone: tighten the crop, reinforce one focal subject, and adjust lighting/color before adding more detail.`
-    : ''
+  const adjectiveAdvice = (() => {
+    if (!desiredAdjectives.length) return ''
+    const tones = desiredAdjectives.map((word) => {
+      const adjective = word.toLowerCase()
+      if (adjective.includes('bold') || adjective.includes('dramatic')) return `Make “${word}” visible with a tighter crop and stronger black-and-white contrast`
+      if (adjective.includes('lux') || adjective.includes('premium') || adjective.includes('elegant')) return `Create “${word}” with cleaner highlights, balanced shadows, and an uncluttered background`
+      if (adjective.includes('play') || adjective.includes('fun') || adjective.includes('vibrant')) return `Make “${word}” stronger with more vivid color and a more energetic, off-center crop`
+      if (adjective.includes('calm') || adjective.includes('serene') || adjective.includes('soft')) return `Create “${word}” with softer contrast, gentle spacing, and reduced background detail`
+      if (adjective.includes('candid') || adjective.includes('natural') || adjective.includes('authentic')) return `Make “${word}” feel natural by preserving slight motion, reducing rigid symmetry, and keeping light realistic`
+      if (adjective.includes('warm')) return `Strengthen “${word}” with warmer highlights and more balanced golden-hour exposure`
+      if (adjective.includes('dark') || adjective.includes('moody')) return `Create “${word}” with deeper shadows, restrained highlights, and stronger tonal separation`
+      if (adjective.includes('clean') || adjective.includes('minimal')) return `Make “${word}” clear with negative space, a single focal subject, and a simplified background`
+      return `Interpret “${word}” with a focused crop, deliberate framing, and edits that emphasize that exact emotional tone`
+    })
+    return tones.join('. ') + '.'
+  })()
 
   return (
     <main className="min-h-full bg-[#090a0c] px-4 py-5 text-white sm:px-6">

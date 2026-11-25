@@ -348,11 +348,25 @@ export function registerAiChatRoutes(
       })
     }
 
+    let photoContext = ''
+    try {
+      const executor = createUserToolExecutor(c.env, auth.userId, c.req.raw.signal, { room: access.room })
+      const latest = await executor('records.query', {
+        collection: 'photo-analyses',
+        orderBy: 'createdAt',
+        orderDir: 'desc',
+        limit: 1,
+      })
+      photoContext = `\n\nCURRENT PHOTOPULSE ANALYSIS (use this exact context for the user’s recommendations):\n${JSON.stringify(latest)}`
+    } catch (error) {
+      console.warn('[ai-chat] Could not load PhotoPulse analysis context', loggableError(error))
+    }
+
     const { result } = streamDeepSpaceAgent(c.env, {
       profile: 'application',
       modelId: usedModelId,
       authToken: jwt,
-      instructions: systemText,
+      instructions: systemText + photoContext,
       messages,
       tools,
       // Cancel provider and tool work with the request. `onAbort` then saves
